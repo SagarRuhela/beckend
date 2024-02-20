@@ -15,6 +15,12 @@ app.use(express.urlencoded({extended:true,limit:"16kb"}));// used for handling d
 
 app.use(express.static("public"))// for putting file folders like images and we want to store it in our server 
 
-app.use(express.cookieParser());
+app.use(cookieParser());
+
+// import routers
+import userRouter from './routes/user.router.js';
+// here we defined the routes
+
+app.use("/users", userRouter)
 
 export default app;
