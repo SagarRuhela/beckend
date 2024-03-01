@@ -17,7 +17,8 @@ const uploadOnCloudnary= async (localFilePath)=>{
     const res= await cloudinary.uploader.upload(localFilePath,{
         resource_type:'auto',
     });
-    console.log("file is uploaded in the cloudnary",res.url);
+    //console.log("file is uploaded in the cloudnary",res.url);
+    fs.unlinkSync(localFilePath);
     return res;
 
     

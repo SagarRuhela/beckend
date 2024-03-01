@@ -1,6 +1,8 @@
 import mongoose,{Schema} from "mongoose";
-import {Jwt} from "jsonwebtoken";
-import {bcrypt } from "bcrypt";
+import pkg from 'jsonwebtoken';
+const {Jwt} = pkg;
+import * as bcrypt from 'bcrypt'
+//const {bcrypt} = pkg1;
 
 const userSchema=new Schema({
     userName:{
@@ -45,10 +47,10 @@ const userSchema=new Schema({
 },{timestamps:true});
 userSchema.pre("save",async function(next){
      // here we want to encrypt our password
-     if(this.isModified("password")){// this is how we check if some thing is modified or not
-        this.password=bcrypt.hash(this.password,10);
-        next();
-     }
+     if(this.isModified("password")) {// this is how we check if some thing is modified or not
+        this.password= await bcrypt.hash(this.password,10);
+    }
+        this.password=await bcrypt.hash(this.password,10);
      next();
 })
 // checking if password is correct or not
