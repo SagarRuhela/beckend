@@ -15,7 +15,6 @@ try {
     }
     const decodedToken = Jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     console.log("Decoded Token:", decodedToken);
-
     // Proceed with user retrieval and authentication
 } catch (error) {
     console.error("JWT verification failed:", error);
