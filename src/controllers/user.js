@@ -3,6 +3,7 @@ import {apiError} from "../utils/apiError.js";
 import { User } from "../models/user.model.js";
 import {uploadOnCloudnary} from "../utils/cloudnary.js"
 import { apiResponse } from "../utils/apiResponse.js";
+import * as bcrypt from 'bcrypt'
 const registerUser=asyncHandler( async (req,res)=>{
     // get user deails form user 
     // check all the validaton like non empty 
@@ -98,24 +99,29 @@ const loginUser=asyncHandler(async(req,res)=>{
   // give user a access token and a refresh token
   // send cookies for sending the access token and Refresh token
   const{userName,email,password}=req.body;
-       if(!userName || !email){
+  //console.log(password);
+       if(!(userName || email)){
         throw new apiError(400,"userName or email is required");
        }
 
        const user= await User.findOne({
         $or: [{userName},{email}]
        })
+       console.log(user);
        if(!user){
         throw new apiError(400,"userName or email is not registered")
        }
        // check for password
-       const isPasswordValid=user.isPasswordCorrect(password);
+       
+       const isPasswordValid= await user.isPasswordCorrect(password);
+
        if(!isPasswordValid){
         throw new apiError(400,"Password is incorrect");
        }
        const {accessToken, refreshToken}=await generateAccessAndRefreshToken(user._id);
        // upr jo user hai wha pr access token and refresh token ki filed khali hai toh hum ab ek gye user firse call krege so that we have 
        // a user jiske pass access token and refresh token ho mainly refresh token save ho database mai
+       console.log(refreshToken);
        const loggedInUser=await User.findById(user._id).select(
         "-password -refreshToken");
 
@@ -126,8 +132,8 @@ const loginUser=asyncHandler(async(req,res)=>{
         }
         // here we are going to return the response along with cookies
         return res.status(200).cookie("accessToken",accessToken,options)
-        .cookie("refreshToken",refreshToken,options).
-        json(new apiResponse(
+        .cookie("refreshToken",refreshToken,options)
+        .json(new apiResponse(
           200,
           {
             user:loggedInUser,

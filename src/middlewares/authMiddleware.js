@@ -1,24 +1,39 @@
-import { apiError } from "../utils/apiError";
-import { asyncHandler } from "../utils/asyncHandler";
+import 'dotenv/config'
+import { apiError } from "../utils/apiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import Jwt from "jsonwebtoken";
-import { User } from "../models/user.model";
+import { User } from "../models/user.model.js";
 
-export const verifyJWT=asyncHandler(async(req,res,next)=>{
-// we need token mainly access token 
+export const verifyJWT = asyncHandler(async(req, _, next) => {
+    try {
+        const token = (req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "")).trim();
+console.log("Token:", token);
+
 try {
-    const token=req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer","");
-       if(!token){
-        throw new apiError(401,"Unauthorized Request");
-       }
-      const decodedToken=await Jwt.verify(token,process.env.ACCESS_TOKEN_SECRET)
-        const user=await User.findById(decodedToken?._id).select("-password -refreshToken");
-        if(!user){
-            throw new apiError(401,"Invalid Acess Token")
-        }
-        // now add new object to req so that we can use it where we call this middle where
-        req.user=user;//here user is object which carry the user of the model where this middle where called
-        next();
+    if (!token) {
+        throw new apiError(401, "Unauthorized Request");
+    }
+    const decodedToken = Jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    console.log("Decoded Token:", decodedToken);
+
+    // Proceed with user retrieval and authentication
 } catch (error) {
-    throw new apiError(401,error?.message || "Invalid Access Token ")
+    console.error("JWT verification failed:", error);
+    // Handle verification failure
 }
+
+        const user = await User.findById(decodedToken?._id).select("-password -refreshToken")
+    
+        if (!user) {
+            
+            throw new apiError(401, "Invalid Access Token")
+        }
+        
+        //if all good , pass in user object to the request body so that next methods can access the data of body
+        req.user = user;
+        next()
+    } catch (error) {
+        throw new apiError(401, error?.message || "Invalid access token")
+    }
+    
 })

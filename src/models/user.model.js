@@ -47,18 +47,30 @@ const userSchema=new Schema({
 },{timestamps:true});
 userSchema.pre("save",async function(next){
      // here we want to encrypt our password
-     if(this.isModified("password")) {// this is how we check if some thing is modified or not
-        this.password= await bcrypt.hash(this.password,10);
+     const user = this;
+    if (!user.isModified('password')) {
+        return next();
     }
-        this.password=await bcrypt.hash(this.password,10);
-     next();
-})
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(user.password, salt);
+        user.password = hashedPassword;
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
 // checking if password is correct or not
-userSchema.methods.isPasswordCorrect=async function(){
-    return await bcrypt.compare(password,this.password);
+userSchema.methods.isPasswordCorrect=async function(Enterpassword){
+    // console.log(Enterpassword);
+    // console.log(this.password);
+    // const salt = await bcrypt.genSalt(10);
+    //     const hashedPassword = await bcrypt.hash(Enterpassword, salt);
+    //     console.log(hashedPassword)
+     return await bcrypt.compare(Enterpassword,this.password);
 };
 userSchema.methods.generateAccessToken=function(){
-    var token=Jwt.sign({
+    var token=  Jwt.sign({
         _id: this._id,
         email: this.email,
         fullName: this.fullName,
