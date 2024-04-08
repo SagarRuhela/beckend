@@ -4,6 +4,8 @@ import { User } from "../models/user.model.js";
 import {uploadOnCloudnary} from "../utils/cloudnary.js"
 import { apiResponse } from "../utils/apiResponse.js";
 import * as bcrypt from 'bcrypt'
+import pkg from 'jsonwebtoken';
+const { jwt } = pkg;
 const registerUser=asyncHandler( async (req,res)=>{
     // get user deails form user 
     // check all the validaton like non empty 
@@ -80,11 +82,11 @@ const registerUser=asyncHandler( async (req,res)=>{
 const generateAccessAndRefreshToken= async(userId)=>{
   try {
     const user= await User.findById(userId);
-    const refreshToken= await user.generateRefreshToken;
-    const accessToken = await user.generateAccessToken;
+    const refreshToken= await user.generateRefreshToken()
+    const accessToken = await user.generateAccessToken()
     user.refreshToken=refreshToken;
     await user.save({ValidateBeforeSave:false});
-    return{accessToken,refreshToken};
+    return {accessToken,refreshToken};
     
   } catch (error) {
     throw new apiError(500,"Something went Wrong in Access or Refresh Token");
@@ -136,9 +138,9 @@ const loginUser=asyncHandler(async(req,res)=>{
         .json(new apiResponse(
           200,
           {
-            user:loggedInUser,
-            refreshToken:refreshToken,
-            accessToken:accessToken,
+            user:loggedInUser,refreshToken,accessToken
+            // refreshToken:refreshToken,
+            // accessToken:accessToken,
 
           },
           "The user is loggedIn successfully"
@@ -173,7 +175,48 @@ const loggedOut=asyncHandler(async(req,res)=>{
 }
 )
 
+const refreshAccessToken=asyncHandler(async(req,res)=>{
+ try {
+   const incomingRefershToken=res.cookies.refreshToken || req.body.refreshToken;
+   if(!incomingRefershToken){
+     throw apiError(401,"Refersh token is not find")
+   }
+   const decodedToken=jwt.verify(incomingRefershToken,process.env.REFRESH_TOKEN_SECRET);
+   if(!decodedToken){
+     throw new apiError(401,"Token not verifird");
+   }
+    const user=await User.findById(decodedToken?._id);
+    if(!user){
+     throw new apiError(401,"User is invalid");
+    }
+    if(incomingRefershToken!=user?.refreshToken){
+     throw new apiError(401,"refersh Token is inavild or expired")
+    }
+    const {refreshToken,accessToken}= await generateAccessAndRefreshToken(user?.id);
+    const options={
+     httpOnly:true,
+     secure:true,
+   }
+   return res.status(200)
+   .cookie("refereshToken",refreshToken,options)
+   .cookie("accessToken",accessToken,options)
+   .json(
+     new apiResponse(
+       200,
+       {refreshToken,accessToken},
+       "acceess token ans refresh Token is refreshed"
+     )
+   )
+ } catch (error) {
+  throw new apiError(401, error?.message || "invalid Refersh Token")
+  
+ }
+   
+
+})
+
 export { registerUser,
           loginUser,
-          loggedOut
+          loggedOut,
+          refreshAccessToken
         };
