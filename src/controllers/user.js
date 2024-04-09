@@ -4,8 +4,9 @@ import { User } from "../models/user.model.js";
 import {uploadOnCloudnary} from "../utils/cloudnary.js"
 import { apiResponse } from "../utils/apiResponse.js";
 import * as bcrypt from 'bcrypt'
-import pkg from 'jsonwebtoken';
-const { jwt } = pkg;
+import Jwt from 'jsonwebtoken';
+//import pkg from 'jsonwebtoken';
+//const { jwt } = pkg;
 const registerUser=asyncHandler( async (req,res)=>{
     // get user deails form user 
     // check all the validaton like non empty 
@@ -82,8 +83,8 @@ const registerUser=asyncHandler( async (req,res)=>{
 const generateAccessAndRefreshToken= async(userId)=>{
   try {
     const user= await User.findById(userId);
-    const refreshToken= await user.generateRefreshToken()
-    const accessToken = await user.generateAccessToken()
+    const refreshToken= await user.generateRefreshToken();
+    const accessToken = await user.generateAccessToken();
     user.refreshToken=refreshToken;
     await user.save({ValidateBeforeSave:false});
     return {accessToken,refreshToken};
@@ -177,11 +178,13 @@ const loggedOut=asyncHandler(async(req,res)=>{
 
 const refreshAccessToken=asyncHandler(async(req,res)=>{
  try {
-   const incomingRefershToken=res.cookies.refreshToken || req.body.refreshToken;
+   const incomingRefershToken=req.cookies?.refreshToken || req.body.refreshToken;
+   //console.log(incomingRefershToken);
    if(!incomingRefershToken){
-     throw apiError(401,"Refersh token is not find")
+     throw new apiError(401,"Refersh token is not find")
    }
-   const decodedToken=jwt.verify(incomingRefershToken,process.env.REFRESH_TOKEN_SECRET);
+   //console.log("here");
+   const decodedToken=Jwt.verify(incomingRefershToken, process.env.REFRESH_TOKEN_SECRET);
    if(!decodedToken){
      throw new apiError(401,"Token not verifird");
    }
@@ -204,7 +207,7 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
      new apiResponse(
        200,
        {refreshToken,accessToken},
-       "acceess token ans refresh Token is refreshed"
+       "acceess token and refresh Token is refreshed"
      )
    )
  } catch (error) {
