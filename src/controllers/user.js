@@ -5,6 +5,7 @@ import {uploadOnCloudnary} from "../utils/cloudnary.js"
 import { apiResponse } from "../utils/apiResponse.js";
 import * as bcrypt from 'bcrypt'
 import Jwt from 'jsonwebtoken';
+import fs from 'fs';
 //import pkg from 'jsonwebtoken';
 //const { jwt } = pkg;
 const registerUser=asyncHandler( async (req,res)=>{
@@ -41,7 +42,8 @@ const registerUser=asyncHandler( async (req,res)=>{
       // checking for avatar and coverImage
           const avatarLocalPath=req.files?.avatar?.[0]?.path;
           if(!avatarLocalPath){
-            throw new apiError(400,"Avatar file is required");
+
+            throw new apiError(400,"Avatar file is required ,Error on finding local path of avatar");
           }
           //const coverImageLocalPath=req.files?.coverImage[0]?.path;
           let coverImageLocalPath;
@@ -54,6 +56,10 @@ const registerUser=asyncHandler( async (req,res)=>{
        const avatar=await uploadOnCloudnary(avatarLocalPath);
        const coverImage=await uploadOnCloudnary(coverImageLocalPath);
        if(!avatar){
+          //fs.unlink(avatar);
+          if(coverImage){
+          fs.unlink(coverImage);
+        }
         throw new apiError(400,"Avatar file is required");
        }
        const user=await User.create({
@@ -218,8 +224,104 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
 
 })
 
+//  change the password
+const changeCurrentPassward=asyncHandler(async(req,res)=>{
+  const {currentPassword,newPassword}=req.body;
+
+  // now we are going to get the user form the auth middleware
+   const user=await User.findById(req?.user?._id);
+   // chaking for old paasword Correction
+   const isPasswordCorrect=await user.isPasswordCorrect(currentPassword);
+   if(!isPasswordCorrect){
+    throw new apiError(401,"Old / current Password is not matched");
+   }
+   user.password=newPassword;
+   await user.save({ValidateBeforeSave:false});
+   return res.status(200)
+   .json(new apiResponse(200,{},"the password is Updated Correctly"));
+  });
+
+  // for geeting the current user
+  const getcurrentUser =asyncHandler(async(req,res)=>{
+    return res.status(200).json(
+      200,
+      req.user,
+      "The current user is fetched succesfully"
+    )
+  })
+
+  const updateAccountDetails=asyncHandler(async(req,res)=>{
+   const {fullName,email,} =req.body;
+   if(!fullName || !email){
+    throw new apiError(400,"All field is needed")
+   }
+   const user=User.findByIdAndUpdate(req?.user?._id,
+  {
+    $set:{
+      fullName:fullName,
+      email:email,
+
+    }
+  },
+{
+new:true,
+}).select("-password");
+
+return res.status(200).json(
+  new apiResponse(200,"The account Deatils is updated")
+);
+  })
+
+const updateUserAvatar=asyncHandler(async(req,res)=>{
+  // first we are going to get the files by the user
+ const avatarLocalPath= req.file?.path;
+ if(!avatarLocalPath){
+  throw new apiError(400,"Avatar file is required for updataion");
+ }
+ const avatar= await uploadOnCloudnary(avatarLocalPath);
+ if(!avatar.url){
+  throw new apiError(400,"avator is not uploaded on cloudnary")
+ }
+    const user= await User.findByIdAndUpdate(req?.user?._id,
+    {
+      $set:{
+        avatar:avatar.url,
+      }
+    },{
+      new:true,
+    }).select("-passward");
+    return res.status(200).json(new apiResponse(200,user,"Avatar is updatd successfully"))
+})
+
+const updateUserCoverImage=asyncHandler(async(req,res)=>{
+  // first we are going to get the files by the user
+ const coverLocalPath= req.file?.path;
+ if(!coverLocalPath){
+  throw new apiError(400,"Cover Image  file is required for updataion");
+ }
+ const cover= await uploadOnCloudnary(coverLocalPath);
+ if(!avatar.url){
+  throw new apiError(400,"Cover image  is not uploaded on cloudnary")
+ }
+    const user= await User.findByIdAndUpdate(req?.user?._id,
+    {
+      $set:{
+        coverImage:cover.url,
+      }
+    },{
+      new:true,
+    }).select("-passward");
+    return res.status(200).json(new apiResponse(200,user,"Cover is updatd successfully"))
+})
+
+
 export { registerUser,
           loginUser,
           loggedOut,
-          refreshAccessToken
+          refreshAccessToken,
+          changeCurrentPassward,
+          getcurrentUser,
+          updateAccountDetails,
+          updateUserAvatar,
+          updateUserCoverImage
         };
