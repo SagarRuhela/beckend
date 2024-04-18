@@ -2,10 +2,14 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {apiError} from "../utils/apiError.js";
 import { User } from "../models/user.model.js";
 import {uploadOnCloudnary} from "../utils/cloudnary.js"
+import { deleteImage } from "../utils/CloudnaryDelete.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import * as bcrypt from 'bcrypt'
 import Jwt from 'jsonwebtoken';
 import fs from 'fs';
+import { subscription } from "../models/subscriptions.model.js";
+import { Mongoose } from "mongoose";
+import { pipeline } from "stream";
 //import pkg from 'jsonwebtoken';
 //const { jwt } = pkg;
 const registerUser=asyncHandler( async (req,res)=>{
@@ -282,6 +286,11 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
  if(!avatar.url){
   throw new apiError(400,"avator is not uploaded on cloudnary")
  }
+ // here takin the url of the old avatar image so that we can delete it after saving new image in databse
+   const user1=await User.findById(req?.user?.id);
+   const oldAvatar= await user1.avatar;
+    //const isImageDelted=deleteImage(oldAvatar);
+    
     const user= await User.findByIdAndUpdate(req?.user?._id,
     {
       $set:{
@@ -290,7 +299,14 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
     },{
       new:true,
     }).select("-passward");
-    return res.status(200).json(new apiResponse(200,user,"Avatar is updatd successfully"))
+    const isImageDelted=deleteImage(oldAvatar);
+    if(isImageDelted){
+      throw new apiError(501,"Old Image is not deleted");
+    }
+
+    
+
+    return res.status(200).json(new apiResponse(200,user,"Avatar is updatd successfully and Old Image is deleted successfuly"))
 })
 
 const updateUserCoverImage=asyncHandler(async(req,res)=>{
@@ -314,6 +330,130 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
     return res.status(200).json(new apiResponse(200,user,"Cover is updatd successfully"))
 })
 
+// for getting the user channel profiles such there subscriber and other details which are going to be shown in the user profile
+ const getUserChannelProfile=asyncHandler(async(req,res)=>{
+  const {userName}=req.params;
+  if(!userName?.trim()){
+    throw new apiError(400,"UserName not found");
+  }
+
+  const channel=await User.aggregate([
+    {
+     $match:{userName:userName.toLowerCase()}
+  },
+  {
+    // here we are finding the subscriber of the profile we are visiting or getting by thier username
+    $lookup:{
+      from: "subscriptions",
+      localField:"_id",
+      foreignField:"channel",
+      as:"subscribers"
+    }
+  },
+  {
+    // here we are finding the users channels in which he subscribed
+    $lookup:{
+      from: "subscriptions",
+      localField:"_id",
+      foreignField:"subscriber",
+      as:"subscribedTo"
+    }
+  },
+  // her i am going to make new fields so that i can acess then in our databse with user id and we don't have to merge again and again
+   {
+    $addFields:{
+      sunscriberCount:{
+        $size:"$subscribers"
+      },
+      sunscribedTo:{
+        $size:"$subscribedTo"
+      },
+      isSubscribed:{
+        $cond:{
+          if:{$in:[req?.user?._id, "$subscribers.subscriber"]},
+          then: true,
+          else:false
+
+        }
+      }
+    }
+   },
+   {
+    // it is used to give only seleted thing so that only useful thing will be given to the fronted for use
+    $project:{
+          // give 1 to give the filed otherwise don;t mention that field
+          userName:1,
+          fullName:1,
+          avatar:1,
+          coverImage:1,
+          sunscriberCount:1,
+          subscribedTo:1,
+          isSubscribed:1,
+          email:1
+
+    }
+   }
+
+
+
+])
+
+if(!channel?.length){
+  throw new apiError(400," channel doesn't exist");
+}
+return res.status(200).
+json(new apiResponse(200, channel[0],"User channel fetechd successfully"))
+ })
+
+ const getWatchedHistory=asyncHandler( async(req,res)=>{
+     const user=await User.aggregate(
+      {
+        $match:{
+          _id:new Mongoose.Types.ObjectId(req?.user?._id)
+        }
+     },
+     {
+      $lookup:{
+        form:"videos",
+        localField:"watchHistory",
+        foreignField:"_id",
+        as:"watchHistory",
+        pipeline:[
+          {
+            $lookup:{
+              from:"users",
+              localField:"owner",
+              foreignField:"_id",
+              as:"owner",
+              pipeline:[
+                {
+                  $project:{
+                    userName:1,
+                    fullName:1,
+                    avatar:1
+                  }
+                }
+              ]
+            }
+          }
+          ,{
+            $addFields:{
+              owner:{
+                $first:"$owner"// this is how we get the first field of the owner array which we get we we lookup or merge
+              }
+            }
+          }
+        ]
+      }
+     }
+    )
+
+    return res.status(200).json(new apiResponse(200,user[0].watchHistory),"watch history fetched successfully")
+ })
+
+ 
+
+
 
 export { registerUser,
           loginUser,
@@ -323,5 +463,7 @@ export { registerUser,
           getcurrentUser,
           updateAccountDetails,
           updateUserAvatar,
-          updateUserCoverImage
+          updateUserCoverImage,
+          getUserChannelProfile,
+          getWatchedHistory
         };
