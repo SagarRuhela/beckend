@@ -9,7 +9,7 @@ export const verifyJWT = asyncHandler(async(req, _, next) => {
         const token = (req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "")).trim();
         //console.log("cookies",req.cookies);
         //console.log("header", req.header("Authorization"));
-        console.log("Token:", token);
+       // console.log("Token:", token);
 
     if (!token) {
         throw new apiError(401, "Unauthorized Request");
@@ -17,7 +17,7 @@ export const verifyJWT = asyncHandler(async(req, _, next) => {
 // const decodedAccessToken = decodeURIComponent(token);
     //console.log(decodedAccessToken);
     const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    console.log("Decoded Token:", decodedToken);
+    //console.log("Decoded Token:", decodedToken);
     // Proceed with user retrieval and authentication
 
    // console.error("JWT verification failed:", error);

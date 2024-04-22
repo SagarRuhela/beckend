@@ -8,7 +8,7 @@ import * as bcrypt from 'bcrypt'
 import Jwt from 'jsonwebtoken';
 import fs from 'fs';
 import { subscription } from "../models/subscriptions.model.js";
-import { Mongoose } from "mongoose";
+import { mongoose } from "mongoose";
 import { pipeline } from "stream";
 //import pkg from 'jsonwebtoken';
 //const { jwt } = pkg;
@@ -230,15 +230,20 @@ throw new apiError(401, error?.message || "invalid Refersh Token")
 
 //  change the password
 const changeCurrentPassward=asyncHandler(async(req,res)=>{
+  //console.log(res);
 const {currentPassword,newPassword}=req.body;
-
+//console.log(currentPassword,newPassword);
+//console.log("here1");
 // now we are going to get the user form the auth middleware
  const user=await User.findById(req?.user?._id);
+ //console.log("here2");  
  // chaking for old paasword Correction
  const isPasswordCorrect=await user.isPasswordCorrect(currentPassword);
+ //console.log("here3");
  if(!isPasswordCorrect){
   throw new apiError(401,"Old / current Password is not matched");
  }
+ //console.log("here4");  
  user.password=newPassword;
  await user.save({ValidateBeforeSave:false});
  return res.status(200)
@@ -247,34 +252,48 @@ const {currentPassword,newPassword}=req.body;
 
 // for geeting the current user
 const getcurrentUser =asyncHandler(async(req,res)=>{
-  return res.status(200).json(
+  //console.log("user is hereeeeeee",req.user);
+  //const user=req.user;
+  return res.status(200)
+  .json( new apiResponse (
     200,
     req.user,
     "The current user is fetched succesfully"
-  )
+  ))
 })
 
-const updateAccountDetails=asyncHandler(async(req,res)=>{
- const {fullName,email,} =req.body;
- if(!fullName || !email){
-  throw new apiError(400,"All field is needed")
- }
- const user=User.findByIdAndUpdate(req?.user?._id,
-{
-  $set:{
-    fullName:fullName,
-    email:email,
-
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    throw new apiError(400, "All fields are needed");
   }
-},
-{
-new:true,
-}).select("-password");
 
-return res.status(200).json(
-new apiResponse(200,"The account Deatils is updated")
-);
-})
+  // Update the user document and await the result
+  const user = await User.findByIdAndUpdate(
+    req?.user?._id,
+    {
+      $set: {
+        fullName: fullName,
+        email: email,
+      },
+    },
+    {
+      new: true,
+    }
+  )
+  .select("-password")
+  //.lean(); // Use lean() to get a plain JavaScript object
+
+  // Check if user is found
+  if (!user) {
+    throw new apiError(404, "User not found");
+  }
+
+  // Send the response with the updated user
+  return res.status(200).json(
+    new apiResponse(200, user, "The account details have been updated")
+  );
+});
 
 const updateUserAvatar=asyncHandler(async(req,res)=>{
 // first we are going to get the files by the user
@@ -289,6 +308,7 @@ throw new apiError(400,"avator is not uploaded on cloudnary")
 // here takin the url of the old avatar image so that we can delete it after saving new image in databse
  const user1=await User.findById(req?.user?.id);
  const oldAvatar= await user1.avatar;
+  console.log("old avatar",oldAvatar);
   //const isImageDelted=deleteImage(oldAvatar);
   
   const user= await User.findByIdAndUpdate(req?.user?._id,
@@ -299,8 +319,9 @@ throw new apiError(400,"avator is not uploaded on cloudnary")
   },{
     new:true,
   }).select("-passward");
-  const isImageDelted=deleteImage(oldAvatar);
-  if(isImageDelted){
+
+  const isImageDelted=  deleteImage(oldAvatar);
+  if(!isImageDelted){
     throw new apiError(501,"Old Image is not deleted");
   }
 
@@ -316,7 +337,7 @@ if(!coverLocalPath){
 throw new apiError(400,"Cover Image  file is required for updataion");
 }
 const cover= await uploadOnCloudnary(coverLocalPath);
-if(!avatar.url){
+if(!cover.url){
 throw new apiError(400,"Cover image  is not uploaded on cloudnary")
 }
   const user= await User.findByIdAndUpdate(req?.user?._id,
@@ -333,10 +354,12 @@ throw new apiError(400,"Cover image  is not uploaded on cloudnary")
 // for getting the user channel profiles such there subscriber and other details which are going to be shown in the user profile
 const getUserChannelProfile=asyncHandler(async(req,res)=>{
 const {userName}=req.params;
+console.log(userName);
 if(!userName?.trim()){
   throw new apiError(400,"UserName not found");
 }
-
+const username=await User.findById(req?.user?._id).select("userName");
+console.log(username);
 const channel=await User.aggregate([
   {
    $match:{userName:userName.toLowerCase()}
@@ -398,7 +421,7 @@ const channel=await User.aggregate([
 
 ])
 
-if(!channel?.length){
+if(channel.length==0){
 throw new apiError(400," channel doesn't exist");
 }
 return res.status(200).
@@ -406,49 +429,50 @@ json(new apiResponse(200, channel[0],"User channel fetechd successfully"))
 })
 
 const getWatchedHistory=asyncHandler( async(req,res)=>{
-   const user=await User.aggregate(
+  const user = await User.aggregate([
     {
-      $match:{
-        _id:new Mongoose.Types.ObjectId(req?.user?._id)
+      $match: {
+        _id: new mongoose.Types.ObjectId(req?.user?._id)
       }
-   },
-   {
-    $lookup:{
-      form:"videos",
-      localField:"watchHistory",
-      foreignField:"_id",
-      as:"watchHistory",
-      pipeline:[
-        {
-          $lookup:{
-            from:"users",
-            localField:"owner",
-            foreignField:"_id",
-            as:"owner",
-            pipeline:[
-              {
-                $project:{
-                  userName:1,
-                  fullName:1,
-                  avatar:1
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    userName: 1,
+                    fullName: 1,
+                    avatar: 1
+                  }
                 }
+              ]
+            }
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner"
               }
-            ]
-          }
-        }
-        ,{
-          $addFields:{
-            owner:{
-              $first:"$owner"// this is how we get the first field of the owner array which we get we we lookup or merge
             }
           }
-        }
-      ]
+        ]
+      }
     }
-   }
-  )
+  ]);
+  
 
-  return res.status(200).json(new apiResponse(200,user[0].watchHistory),"watch history fetched successfully")
+  return res.status(200).json(new apiResponse(200,user[0].watchHistory,"watch history fetched successfully"))
 })
 
  

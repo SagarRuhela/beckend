@@ -14,12 +14,16 @@ cloudinary.config({
           if(!ImageUrl){
            return null;
           }
-         const publicId =await extractPublicId(
-           ImageUrl
+          console.log("Image URL",ImageUrl);
+         const publicId =extractPublicId(
+            ImageUrl
          )
-         const isDeleted=cloudinary.uploader
+         console.log("Public ID",publicId);
+         const isDeleted= await cloudinary.uploader
          .destroy(publicId);
-         return isDeleted;
+          
+         console.log("isDeleted",isDeleted);
+         return isDeleted;  
      } catch (error) {
         console.log(error,"Error while delteing the image");
      }

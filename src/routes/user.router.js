@@ -22,7 +22,7 @@ router.route("/loggedOutUser").post(verifyJWT,loggedOut);
 // route for refresh the refresh Access Toeken
 router.route("/refreshToken").post(refreshAccessToken);
 
-router.route("/changePassward").patch(verifyJWT,changeCurrentPassward);
+router.route("/changePassword").patch(verifyJWT,changeCurrentPassward);
 
 router.route("/currentUser").get(verifyJWT,getcurrentUser);
 

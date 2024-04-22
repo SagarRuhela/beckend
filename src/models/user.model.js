@@ -62,12 +62,12 @@ userSchema.pre("save",async function(next){
 });
 // checking if password is correct or not
 userSchema.methods.isPasswordCorrect=async function(Enterpassword){
-    // console.log(Enterpassword);
-    // console.log(this.password);
+    //console.log(Enterpassword);
+     //console.log(this.password);
     // const salt = await bcrypt.genSalt(10);
-    //     const hashedPassword = await bcrypt.hash(Enterpassword, salt);
-    //     console.log(hashedPassword)
-     return await bcrypt.compare(Enterpassword,this.password);
+    // const hashedPassword = await bcrypt.hash(Enterpassword, salt);
+    //console.log(hashedPassword)
+    return await bcrypt.compare(Enterpassword,this.password);
 };
 userSchema.methods.generateAccessToken=function(){
     return  Jwt.sign({
